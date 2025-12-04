@@ -93,7 +93,7 @@ body {
 }
 
 #search {
-  padding: 10px 40px 10px 12px;
+  padding: 10px 80px 10px 12px;
   font-size: 16px;
   border-radius: 999px;
   border: 1px solid var(--green-soft);
@@ -101,13 +101,17 @@ body {
   box-sizing: border-box;
   background: var(--white);
   color: var(--green-dark);
+
+  white-space: nowrap;        /* ligne unique */
+  overflow: hidden;           /* pas de dépassement */
+  text-overflow: ellipsis;    /* … si c'est trop long */
 }
 
 #search::placeholder {
   color: var(--green-medium);
 }
 
-/* Bouton 🔍 */
+/* Bouton recherche et reset*/
 #search-btn {
   position: absolute;
   right: 10px;
@@ -120,6 +124,21 @@ body {
 }
 
 #search-btn:hover {
+  color: var(--green-dark);
+}
+
+#clear-btn {
+  position: absolute;
+  right: 40px;
+  font-size: 16px;
+  background: none;
+  border: none;
+  color: var(--green-medium);
+  cursor: pointer;
+  display: none; /* caché tant que l'input est vide */
+}
+
+#clear-btn:hover {
   color: var(--green-dark);
 }
 
@@ -153,6 +172,11 @@ body {
 
 #suggestions li:hover {
   background: var(--green-soft);
+}
+
+#suggestions li.active {
+  background: var(--green-soft);
+  font-weight: 600;
 }
 
 #suggestions:empty {
