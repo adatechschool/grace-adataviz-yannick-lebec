@@ -92,7 +92,6 @@ body {
   align-items: center;
 }
 
-/* Champ de recherche */
 #search {
   padding: 10px 40px 10px 12px;
   font-size: 16px;
@@ -100,7 +99,6 @@ body {
   border: 1px solid var(--green-soft);
   width: 100%;
   box-sizing: border-box;
-
   background: var(--white);
   color: var(--green-dark);
 }
@@ -157,8 +155,29 @@ body {
   background: var(--green-soft);
 }
 
+#suggestions:empty {
+  display: none;
+}
+
 /* -------------------------------------------------
-   4. CARTES (Desktop)
+   4. Message AUCUN RÉSULTAT
+------------------------------------------------- */
+
+.no-results-inline {
+  text-align: center;
+  color: var(--white);
+  font-size: 18px;
+  margin-top: 20px;
+  padding: 12px 16px;
+  background: rgba(46, 125, 50, 0.85);
+  border-radius: var(--radius-medium);
+  backdrop-filter: blur(4px);
+}
+
+
+
+/* -------------------------------------------------
+   5. CARTES (Desktop)
 ------------------------------------------------- */
 
 .card {
@@ -166,7 +185,7 @@ body {
   align-items: center;
   gap: 16px;
 
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.85);
   border-radius: var(--radius-large);
   padding: 12px;
   margin-bottom: 14px;
@@ -210,17 +229,17 @@ body {
 }
 
 /* -------------------------------------------------
-   5. MODAL IMAGE (image en grand)
+   6. MODAL IMAGES
 ------------------------------------------------- */
 
 .image-modal {
-  display: none; /* caché par défaut */
+  display: none;
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
   justify-content: center;
   align-items: center;
   z-index: 2000;
@@ -236,7 +255,59 @@ body {
 }
 
 /* -------------------------------------------------
-   6. RESPONSIVE : Version mobile (<= 480px)
+   7. Bouton "Voir plus / Voir moins"
+------------------------------------------------- */
+
+.see-more-btn {
+  width: 100px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  font-size: 14px;
+  border: none;
+  border-radius: var(--radius-small);
+  background: var(--green-light);
+  color: var(--white);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.see-more-btn:hover {
+  background: var(--green-main);
+}
+
+/* ---------------------------------------------------
+8. Bouton "charger plus"
+--------------------------------------------------- */
+
+#load-more {
+  display: block;
+  margin: 24px auto;
+  padding: 12px 26px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 999px;
+
+  color: var(--white);
+  background: linear-gradient(135deg, var(--green-main), var(--green-light));
+
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.3s ease;
+}
+
+#load-more:hover {
+  background: linear-gradient(135deg, var(--green-dark), var(--green-main));
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(46, 125, 50, 0.35);
+}
+
+#load-more:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(46, 125, 50, 0.2);
+}
+/* -------------------------------------------------
+   8. Version mobile
 ------------------------------------------------- */
 
 @media (max-width: 480px) {
@@ -263,18 +334,17 @@ body {
     padding: 8px 38px 8px 12px;
   }
 
-  /* Cartes en colonne */
   .card {
     flex-direction: column;
     align-items: flex-start;
-    padding: 10px;
-    gap: 10px;
+    padding: 12px;
+    gap: 12px;
   }
 
   .card img {
     width: 100%;
     height: auto;
-    max-height: 200px;
+    max-height: 220px;
   }
 
   .card-content {
