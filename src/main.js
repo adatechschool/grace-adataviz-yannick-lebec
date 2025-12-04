@@ -1,6 +1,7 @@
 // -------------------------------------------------------------
 // 0) Construction du DOM
 // -------------------------------------------------------------
+
 function buildLayout() {
   const body = document.body;
 
@@ -73,6 +74,7 @@ function buildLayout() {
 // -------------------------------------------------------------
 // 1) API + Utils
 // -------------------------------------------------------------
+
 async function fetchApi() {
   try {
     const response = await fetch(
@@ -94,6 +96,7 @@ function normalize(str) {
 // -------------------------------------------------------------
 // 2) App principale
 // -------------------------------------------------------------
+
 document.addEventListener("DOMContentLoaded", async () => {
   const {
     container,
@@ -115,6 +118,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // -------------------------------------------------------------
   // 2.x) MESSAGE "AUCUN RESULTAT"
   // -------------------------------------------------------------
+
   function showNoResults() {
     let msg = document.querySelector(".no-results-inline");
     if (!msg) {
@@ -133,6 +137,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // -------------------------------------------------------------
   // Affichage par lots
   // -------------------------------------------------------------
+
   function showMore() {
     cards.forEach(({ element }, i) => {
       element.style.display = i < visibleCount ? "flex" : "none";
@@ -146,13 +151,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function resetList() {
     visibleCount = INITIAL_VISIBLE;
-    hideNoResults(); // ← IMPORTANT
+    hideNoResults();
     showMore();
   }
 
   // -------------------------------------------------------------
   // Suggestions
   // -------------------------------------------------------------
+
   function clearSuggestions() {
     suggestionsList.innerHTML = "";
     suggestionsList.style.display = "none";
@@ -189,6 +195,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // -------------------------------------------------------------
   // Choisir une suggestion → un seul arbre
   // -------------------------------------------------------------
+
   function chooseSuggestion(label) {
     searchInput.value = label;
     clearBtn.style.display = "block";
@@ -204,7 +211,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // -------------------------------------------------------------
   // Recherche globale (Enter ou loupe)
-// -------------------------------------------------------------
+  // -------------------------------------------------------------
+
   function runSearch(query) {
     const q = normalize(query);
     hideNoResults(); // ← important
@@ -230,6 +238,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // -------------------------------------------------------------
   // Construction des cartes depuis l'API
   // -------------------------------------------------------------
+
   const data = await fetchApi();
 
   data.results.forEach((item) => {
@@ -297,6 +306,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // -------------------------------------------------------------
   // Bouton "Charger plus"
   // -------------------------------------------------------------
+  
   loadMoreBtn = document.createElement("button");
   loadMoreBtn.id = "load-more";
   loadMoreBtn.textContent = "Charger plus";
@@ -326,7 +336,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // -------------------------------------------------------------
   // Recherche + navigation au clavier
   // -------------------------------------------------------------
-  
+
   searchInput.addEventListener("input", () => {
     clearBtn.style.display = searchInput.value.trim()
       ? "block"
