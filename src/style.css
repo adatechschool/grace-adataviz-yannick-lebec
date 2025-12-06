@@ -170,6 +170,28 @@ header h1 {
 }
 
 /* -----------------------------
+   Bouton "Charger plus"
+------------------------------ */
+.load-more {
+  display: block;
+  margin: 1rem auto 0 auto;
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
+  border: none;
+  background: #227733;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  transition: background 0.2s, transform 0.1s;
+}
+
+.load-more:hover {
+  background: #1a5b29;
+  transform: translateY(-1px);
+}
+
+/* -----------------------------
    Modal image plein écran
 ------------------------------ */
 .image-modal {
@@ -208,7 +230,7 @@ header h1 {
 }
 
 /* -----------------------------
-   Responsive mobile (téléphone)
+   Responsive mobile
 ------------------------------ */
 @media (max-width: 480px) {
   body {

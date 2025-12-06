@@ -1,7 +1,6 @@
-// --------------------------------------------
+// ------------------------------------------------------------
 // 1) Création du layout (header, recherche, conteneur, modal)
-// --------------------------------------------
-
+// ------------------------------------------------------------
 function createLayout() {
   const body = document.body;
 
@@ -81,20 +80,21 @@ const { searchInput, searchIcon, clearIcon, app, imageModal, modalImg } =
   createLayout();
 
 // --------------------------------------------
-// 2) Appel de l'API
+// 2) Variables globales
 // --------------------------------------------
+let dataResults = [];
+const allCards = [];
+let visibleCount = 10;
+const STEP = 10;
+let loadMoreBtn = null;
 
-async function fetchApi(query = "") {
+// --------------------------------------------
+// 3) Appel de l'API
+// --------------------------------------------
+async function fetchApi() {
   try {
-    let url =
-      "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/arbresremarquablesparis/records";
-
-    if (query) {
-      const encodedQuery = encodeURIComponent(query);
-      url += `?where=search(all,'${encodedQuery}')&limit=50`;
-    } else {
-      url += "?limit=20";
-    }
+    const url =
+      "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/arbresremarquablesparis/records?limit=100";
 
     const response = await fetch(url);
 
@@ -111,16 +111,15 @@ async function fetchApi(query = "") {
 }
 
 // --------------------------------------------
-// 3) Message "Aucun résultat"
+// 4) Message "Aucun résultat"
 // --------------------------------------------
-
 function showNoResults() {
   let msg = document.querySelector(".no-results");
 
   if (!msg) {
     msg = document.createElement("div");
     msg.className = "no-results";
-    msg.textContent = "Aucun arbre ne correspond à votre recherche.";
+    msg.textContent = "Aucun arbre ne correspond à votre recherche 🌿";
     app.appendChild(msg);
   }
 }
@@ -131,54 +130,34 @@ function hideNoResults() {
 }
 
 // --------------------------------------------
-// 4) Fonction de recherche
+// 5) Mise à jour de l'affichage des cartes
 // --------------------------------------------
-
-function runSearch() {
-  const value = searchInput.value.toLowerCase().trim();
-  const cards = document.querySelectorAll(".card");
-
-  hideNoResults(); // on enlève d'abord le message s'il existe
-
-  // Si input vide → on réaffiche tout et on ne montre pas de message
-  if (!value) {
-    cards.forEach((card) => {
-      card.style.display = "flex";
-    });
-    return;
-  }
-
-  let found = 0;
-
-  cards.forEach((card) => {
-    const text = card.innerText.toLowerCase();
-    const match = text.includes(value);
-    card.style.display = match ? "flex" : "none";
-    if (match) found++;
+function updateVisibleCards() {
+  hideNoResults();
+  allCards.forEach((card, index) => {
+    card.style.display = index < visibleCount ? "flex" : "none";
   });
 
-  if (found === 0) {
-    showNoResults();
+  if (loadMoreBtn) {
+    loadMoreBtn.style.display =
+      visibleCount >= allCards.length ? "none" : "block";
   }
 }
 
-// --------------------------------------------
-// 5) Affichage des données + interactions
-// --------------------------------------------
+// ----------------------------------------------
+// 6) Création des cartes
+// ----------------------------------------------
+function renderCards(results) {
+  app.innerHTML = "";
+  allCards.length = 0;
+  hideNoResults();
 
-fetchApi().then((data) => {
-  if (!data || !data.results) {
-    console.error("No results in API response");
-    return;
-  }
-
-  data.results.forEach((item) => {
+  results.forEach((item) => {
     const espece = item.arbres_espece;
     const adresse = item.arbres_adresse;
     const descriptif = item.com_descriptif;
     const photo = item.com_url_photo1;
 
-    // ------------ Création de la carte ------------
     const card = document.createElement("div");
     card.classList.add("card");
 
@@ -207,7 +186,6 @@ fetchApi().then((data) => {
     pAdresse.textContent = adresse ?? "Adresse non renseignée";
     content.appendChild(pAdresse);
 
-    // ------------ Descriptif + See more / See less ------------
     const pDescriptif = document.createElement("p");
     pDescriptif.textContent = descriptif ?? "Aucun descriptif";
     pDescriptif.classList.add("description", "hidden");
@@ -232,11 +210,69 @@ fetchApi().then((data) => {
 
     card.appendChild(content);
     app.appendChild(card);
+
+    allCards.push(card);
   });
 
-  // --------------------------------------------
-  // 6) Interactions de la barre de recherche
-  // --------------------------------------------
+  if (!loadMoreBtn) {
+    loadMoreBtn = document.createElement("button");
+    loadMoreBtn.id = "load-more";
+    loadMoreBtn.classList.add("load-more");
+    loadMoreBtn.textContent = "Charger plus";
+    app.insertAdjacentElement("afterend", loadMoreBtn);
+
+    loadMoreBtn.addEventListener("click", () => {
+      visibleCount += STEP;
+      updateVisibleCards();
+    });
+  }
+
+  if (searchInput.value.trim() === "") {
+    visibleCount = 10;
+    updateVisibleCards();
+  } else {
+    allCards.forEach((card) => {
+      card.style.display = "flex";
+    });
+    if (loadMoreBtn) loadMoreBtn.style.display = "none";
+    if (allCards.length === 0) showNoResults();
+  }
+}
+
+// --------------------------------------------
+// 7) Fonction de recherche côté front
+// --------------------------------------------
+function runSearch() {
+  const q = searchInput.value.toLowerCase().trim();
+  hideNoResults();
+
+  if (!q) {
+    visibleCount = 10;
+    renderCards(dataResults);
+    return;
+  }
+
+  const filtered = dataResults.filter((item) => {
+    const espece = (item.arbres_espece || "").toLowerCase();
+    const adresse = (item.arbres_adresse || "").toLowerCase();
+    const descriptif = (item.com_descriptif || "").toLowerCase();
+
+    const text = `${espece} ${adresse} ${descriptif}`;
+    return text.includes(q);
+  });
+
+  renderCards(filtered);
+}
+
+// --------------------------------------------
+// 8) Chargement initial
+// --------------------------------------------
+(async function init() {
+  const data = await fetchApi();
+  if (data && data.results) {
+    dataResults = data.results;
+    renderCards(dataResults);
+  }
 
   searchIcon.addEventListener("click", () => {
     runSearch();
@@ -248,27 +284,18 @@ fetchApi().then((data) => {
     }
   });
 
-  // Afficher / cacher la croix selon le contenu
   searchInput.addEventListener("input", () => {
-    hideNoResults(); // si l’utilisateur change le texte, on enlève le message
-    clearIcon.style.display = searchInput.value.trim() ? "block" : "none";
-
-    // Si l'input devient vide, on réaffiche toutes les cartes
-    if (!searchInput.value.trim()) {
-      const cards = document.querySelectorAll(".card");
-      cards.forEach((card) => {
-        card.style.display = "flex";
-      });
+    const hasValue = searchInput.value.trim() !== "";
+    clearIcon.style.display = hasValue ? "block" : "none";
+    if (!hasValue) {
+      runSearch();
     }
   });
 
+  // retour dataset initial
   clearIcon.addEventListener("click", () => {
     searchInput.value = "";
     clearIcon.style.display = "none";
-    hideNoResults();
-
-    document.querySelectorAll(".card").forEach((card) => {
-      card.style.display = "flex";
-    });
+    runSearch();
   });
-});
+})();
