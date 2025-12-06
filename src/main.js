@@ -1,58 +1,55 @@
-// -------------------------------------------------------------
-// 0) Construction du DOM
-// -------------------------------------------------------------
+// --------------------------------------------
+// 1) Création du layout (header, recherche, conteneur, modal)
+// --------------------------------------------
 
-function buildLayout() {
+function createLayout() {
   const body = document.body;
 
-  const mainContainer = document.createElement("div");
-  body.appendChild(mainContainer);
-
-  const header = document.createElement("div");
-  header.classList.add("header");
-  mainContainer.appendChild(header);
+  const header = document.createElement("header");
 
   const title = document.createElement("h1");
-  title.classList.add("header-title");
-  title.textContent = "Arbres remarquables à Paris";
+  title.textContent = "Arbres remarquables de Paris";
   header.appendChild(title);
 
-  const searchWrapper = document.createElement("div");
-  searchWrapper.classList.add("search-wrapper");
-  header.appendChild(searchWrapper);
+  const searchContainer = document.createElement("div");
+  searchContainer.classList.add("search-box");
 
-  const searchBox = document.createElement("div");
-  searchBox.classList.add("search-box");
-  searchWrapper.appendChild(searchBox);
+  const searchInputWrapper = document.createElement("div");
+  searchInputWrapper.classList.add("input-wrapper");
 
   const searchInput = document.createElement("input");
   searchInput.type = "text";
   searchInput.id = "search";
-  searchInput.placeholder = "Rechercher un arbre...";
-  searchInput.autocomplete = "off";
-  searchBox.appendChild(searchInput);
+  searchInput.placeholder = "Rechercher une espèce, une adresse...";
 
-  const clearBtn = document.createElement("button");
-  clearBtn.id = "clear-btn";
-  clearBtn.textContent = "✖";
-  searchBox.appendChild(clearBtn);
+  const clearIcon = document.createElement("span");
+  clearIcon.classList.add("clear-icon");
+  clearIcon.textContent = "✖";
+  clearIcon.style.display = "none"; // cachée tant que l’input est vide
 
-  const searchBtn = document.createElement("button");
-  searchBtn.id = "search-btn";
-  searchBtn.textContent = "🔍";
-  searchBox.appendChild(searchBtn);
+  const searchIcon = document.createElement("span");
+  searchIcon.classList.add("search-icon");
+  searchIcon.textContent = "🔍";
 
-  const suggestionsList = document.createElement("ul");
-  suggestionsList.id = "suggestions";
-  searchWrapper.appendChild(suggestionsList);
+  searchInputWrapper.appendChild(searchInput);
+  searchInputWrapper.appendChild(clearIcon);
+  searchInputWrapper.appendChild(searchIcon);
 
-  const events = document.createElement("div");
-  events.id = "events";
-  mainContainer.appendChild(events);
+  searchContainer.appendChild(searchInputWrapper);
+  header.appendChild(searchContainer);
+
+  let app = document.querySelector("#app");
+  if (!app) {
+    app = document.createElement("div");
+    app.id = "app";
+    body.appendChild(app);
+  }
+
+  body.insertBefore(header, app);
 
   const imageModal = document.createElement("div");
-  imageModal.id = "image-modal";
   imageModal.classList.add("image-modal");
+  imageModal.id = "image-modal";
 
   const modalImg = document.createElement("img");
   modalImg.id = "modal-img";
@@ -60,334 +57,218 @@ function buildLayout() {
 
   body.appendChild(imageModal);
 
+  imageModal.addEventListener("click", () => {
+    imageModal.classList.remove("open");
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      imageModal.classList.remove("open");
+    }
+  });
+
   return {
-    container: events,
     searchInput,
-    suggestionsList,
-    searchBtn,
-    clearBtn,
+    searchIcon,
+    clearIcon,
+    app,
     imageModal,
     modalImg,
   };
 }
 
-// -------------------------------------------------------------
-// 1) API + Utils
-// -------------------------------------------------------------
+const { searchInput, searchIcon, clearIcon, app, imageModal, modalImg } =
+  createLayout();
 
-async function fetchApi() {
+// --------------------------------------------
+// 2) Appel de l'API
+// --------------------------------------------
+
+async function fetchApi(query = "") {
   try {
-    const response = await fetch(
-      "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/arbresremarquablesparis/records?limit=100"
-    );
-    return await response.json();
+    let url =
+      "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/arbresremarquablesparis/records";
+
+    if (query) {
+      const encodedQuery = encodeURIComponent(query);
+      url += `?where=search(all,'${encodedQuery}')&limit=50`;
+    } else {
+      url += "?limit=20";
+    }
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error("HTTP error " + response.status);
+    }
+
+    const data = await response.json();
+    console.log("Données API :", data);
+    return data;
   } catch (error) {
-    console.log(error);
+    console.error("Error fetching data:", error);
   }
 }
 
-function normalize(str) {
-  return (str || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+// --------------------------------------------
+// 3) Message "Aucun résultat"
+// --------------------------------------------
+
+function showNoResults() {
+  let msg = document.querySelector(".no-results");
+
+  if (!msg) {
+    msg = document.createElement("div");
+    msg.className = "no-results";
+    msg.textContent = "Aucun arbre ne correspond à votre recherche.";
+    app.appendChild(msg);
+  }
 }
 
-// -------------------------------------------------------------
-// 2) App principale
-// -------------------------------------------------------------
+function hideNoResults() {
+  const msg = document.querySelector(".no-results");
+  if (msg) msg.remove();
+}
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const {
-    container,
-    searchInput,
-    suggestionsList,
-    searchBtn,
-    clearBtn,
-    imageModal,
-    modalImg,
-  } = buildLayout();
+// --------------------------------------------
+// 4) Fonction de recherche
+// --------------------------------------------
 
-  const cards = [];
-  const INITIAL_VISIBLE = 10;
-  const STEP = 10;
-  let visibleCount = INITIAL_VISIBLE;
-  let loadMoreBtn = null;
-  let activeIndex = -1;
+function runSearch() {
+  const value = searchInput.value.toLowerCase().trim();
+  const cards = document.querySelectorAll(".card");
 
-  // -------------------------------------------------------------
-  // 2.x) MESSAGE "AUCUN RESULTAT"
-  // -------------------------------------------------------------
+  hideNoResults(); // on enlève d'abord le message s'il existe
 
-  function showNoResults() {
-    let msg = document.querySelector(".no-results-inline");
-    if (!msg) {
-      msg = document.createElement("div");
-      msg.className = "no-results-inline";
-      msg.textContent = "Aucun arbre ne correspond à votre recherche 🌿";
-      container.appendChild(msg);
-    }
-  }
-
-  function hideNoResults() {
-    const msg = document.querySelector(".no-results-inline");
-    if (msg) msg.remove();
-  }
-
-  // -------------------------------------------------------------
-  // Affichage par lots
-  // -------------------------------------------------------------
-
-  function showMore() {
-    cards.forEach(({ element }, i) => {
-      element.style.display = i < visibleCount ? "flex" : "none";
+  // Si input vide → on réaffiche tout et on ne montre pas de message
+  if (!value) {
+    cards.forEach((card) => {
+      card.style.display = "flex";
     });
-
-    if (loadMoreBtn) {
-      loadMoreBtn.style.display =
-        visibleCount >= cards.length ? "none" : "block";
-    }
+    return;
   }
 
-  function resetList() {
-    visibleCount = INITIAL_VISIBLE;
-    hideNoResults();
-    showMore();
+  let found = 0;
+
+  cards.forEach((card) => {
+    const text = card.innerText.toLowerCase();
+    const match = text.includes(value);
+    card.style.display = match ? "flex" : "none";
+    if (match) found++;
+  });
+
+  if (found === 0) {
+    showNoResults();
   }
+}
 
-  // -------------------------------------------------------------
-  // Suggestions
-  // -------------------------------------------------------------
+// --------------------------------------------
+// 5) Affichage des données + interactions
+// --------------------------------------------
 
-  function clearSuggestions() {
-    suggestionsList.innerHTML = "";
-    suggestionsList.style.display = "none";
-    activeIndex = -1;
+fetchApi().then((data) => {
+  if (!data || !data.results) {
+    console.error("No results in API response");
+    return;
   }
-
-  function highlightSuggestion() {
-    const items = suggestionsList.querySelectorAll("li");
-    items.forEach((li, i) => {
-      li.classList.toggle("active", i === activeIndex);
-    });
-  }
-
-  function updateSuggestions(value) {
-    const q = normalize(value);
-    clearSuggestions();
-    if (!q) return;
-
-    const matches = cards.filter((c) => c.searchText.includes(q));
-    const unique = Array.from(new Map(matches.map((m) => [m.label, m])).values());
-
-    unique.slice(0, 10).forEach((c) => {
-      const li = document.createElement("li");
-      li.textContent = c.label;
-      li.addEventListener("mousedown", () => chooseSuggestion(c.label));
-      suggestionsList.appendChild(li);
-    });
-
-    if (unique.length > 0) {
-      suggestionsList.style.display = "block";
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Choisir une suggestion → un seul arbre
-  // -------------------------------------------------------------
-
-  function chooseSuggestion(label) {
-    searchInput.value = label;
-    clearBtn.style.display = "block";
-    clearSuggestions();
-    hideNoResults(); // ← IMPORTANT
-
-    cards.forEach(({ element, label: cardLabel }) => {
-      element.style.display = label === cardLabel ? "flex" : "none";
-    });
-
-    if (loadMoreBtn) loadMoreBtn.style.display = "none";
-  }
-
-  // -------------------------------------------------------------
-  // Recherche globale (Enter ou loupe)
-  // -------------------------------------------------------------
-
-  function runSearch(query) {
-    const q = normalize(query);
-    hideNoResults(); // ← important
-
-    if (!q) {
-      resetList();
-      return;
-    }
-
-    let found = 0;
-
-    cards.forEach(({ element, searchText }) => {
-      const match = searchText.includes(q);
-      element.style.display = match ? "flex" : "none";
-      if (match) found++;
-    });
-
-    if (found === 0) showNoResults();
-
-    if (loadMoreBtn) loadMoreBtn.style.display = "none";
-  }
-
-  // -------------------------------------------------------------
-  // Construction des cartes depuis l'API
-  // -------------------------------------------------------------
-
-  const data = await fetchApi();
 
   data.results.forEach((item) => {
-    const div = document.createElement("div");
-    div.classList.add("card");
+    const espece = item.arbres_espece;
+    const adresse = item.arbres_adresse;
+    const descriptif = item.com_descriptif;
+    const photo = item.com_url_photo1;
 
-    const espece = item.arbres_espece || "";
-    const adresse = item.arbres_adresse || "";
-    const descriptif = item.com_descriptif || "";
-    const photo = item.com_url_photo1 || "";
-
-    const img = document.createElement("img");
-    img.classList.add("card-img");
-    img.alt = espece;
+    // ------------ Création de la carte ------------
+    const card = document.createElement("div");
+    card.classList.add("card");
 
     if (photo) {
+      const img = document.createElement("img");
       img.src = photo;
+      img.alt = espece ?? "Arbre remarquable";
+
       img.addEventListener("click", () => {
         modalImg.src = photo;
-        imageModal.style.display = "flex";
+        modalImg.alt = img.alt;
+        imageModal.classList.add("open");
       });
-    } else img.style.display = "none";
 
-    div.appendChild(img);
+      card.appendChild(img);
+    }
 
     const content = document.createElement("div");
     content.classList.add("card-content");
-    div.appendChild(content);
 
-    const title = document.createElement("h2");
-    title.classList.add("card-title");
-    title.textContent = espece || "Arbre remarquable";
-    content.appendChild(title);
+    const h2 = document.createElement("h2");
+    h2.textContent = espece ?? "Espèce inconnue";
+    content.appendChild(h2);
 
-    const subtitle = document.createElement("p");
-    subtitle.classList.add("card-subtitle");
-    subtitle.textContent = adresse;
-    content.appendChild(subtitle);
+    const pAdresse = document.createElement("p");
+    pAdresse.textContent = adresse ?? "Adresse non renseignée";
+    content.appendChild(pAdresse);
 
-    const desc = document.createElement("p");
-    desc.classList.add("card-description");
-    desc.textContent = `Descriptif : ${descriptif}`;
-    desc.style.display = "none";
-    content.appendChild(desc);
+    // ------------ Descriptif + See more / See less ------------
+    const pDescriptif = document.createElement("p");
+    pDescriptif.textContent = descriptif ?? "Aucun descriptif";
+    pDescriptif.classList.add("description", "hidden");
+    content.appendChild(pDescriptif);
 
-    const btn = document.createElement("button");
-    btn.textContent = "Voir plus";
-    btn.classList.add("see-more-btn");
-    btn.addEventListener("click", () => {
-      const show = desc.style.display === "none";
-      desc.style.display = show ? "block" : "none";
-      btn.textContent = show ? "Voir moins" : "Voir plus";
+    const btnToggle = document.createElement("button");
+    btnToggle.textContent = "See more";
+    btnToggle.classList.add("toggle-btn");
+
+    btnToggle.addEventListener("click", () => {
+      const isHidden = pDescriptif.classList.contains("hidden");
+      if (isHidden) {
+        pDescriptif.classList.remove("hidden");
+        btnToggle.textContent = "See less";
+      } else {
+        pDescriptif.classList.add("hidden");
+        btnToggle.textContent = "See more";
+      }
     });
-    content.appendChild(btn);
 
-    container.appendChild(div);
+    content.appendChild(btnToggle);
 
-    const searchText = normalize(div.textContent);
-    const label =
-      espece && adresse ? `${espece} — ${adresse}` : espece || adresse;
-
-    cards.push({ element: div, label, searchText });
+    card.appendChild(content);
+    app.appendChild(card);
   });
 
-  // -------------------------------------------------------------
-  // Bouton "Charger plus"
-  // -------------------------------------------------------------
-  
-  loadMoreBtn = document.createElement("button");
-  loadMoreBtn.id = "load-more";
-  loadMoreBtn.textContent = "Charger plus";
-  container.insertAdjacentElement("afterend", loadMoreBtn);
+  // --------------------------------------------
+  // 6) Interactions de la barre de recherche
+  // --------------------------------------------
 
-  loadMoreBtn.addEventListener("click", () => {
-    visibleCount += STEP;
-    showMore();
-  });
-
-  showMore();
-
-  // -------------------------------------------------------------
-  // Bouton reset ✖
-  // -------------------------------------------------------------
-
-  clearBtn.style.display = "none";
-
-  clearBtn.addEventListener("click", () => {
-    searchInput.value = "";
-    clearBtn.style.display = "none";
-    clearSuggestions();
-    hideNoResults();
-    resetList();
-  });
-
-  // -------------------------------------------------------------
-  // Recherche + navigation au clavier
-  // -------------------------------------------------------------
-
-  searchInput.addEventListener("input", () => {
-    clearBtn.style.display = searchInput.value.trim()
-      ? "block"
-      : "none";
-
-    hideNoResults();
-    updateSuggestions(searchInput.value);
+  searchIcon.addEventListener("click", () => {
+    runSearch();
   });
 
   searchInput.addEventListener("keydown", (e) => {
-    const items = suggestionsList.querySelectorAll("li");
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (items.length > 0) {
-        activeIndex = (activeIndex + 1) % items.length;
-        highlightSuggestion();
-      }
-    }
-
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (items.length > 0) {
-        activeIndex = (activeIndex - 1 + items.length) % items.length;
-        highlightSuggestion();
-      }
-    }
-
     if (e.key === "Enter") {
-      e.preventDefault();
-
-      if (activeIndex >= 0 && items.length > 0) {
-        chooseSuggestion(items[activeIndex].textContent);
-      } else {
-        runSearch(searchInput.value);
-      }
-
-      clearSuggestions();
+      runSearch();
     }
   });
 
-  searchBtn.addEventListener("click", () => {
-    clearSuggestions();
-    runSearch(searchInput.value);
+  // Afficher / cacher la croix selon le contenu
+  searchInput.addEventListener("input", () => {
+    hideNoResults(); // si l’utilisateur change le texte, on enlève le message
+    clearIcon.style.display = searchInput.value.trim() ? "block" : "none";
+
+    // Si l'input devient vide, on réaffiche toutes les cartes
+    if (!searchInput.value.trim()) {
+      const cards = document.querySelectorAll(".card");
+      cards.forEach((card) => {
+        card.style.display = "flex";
+      });
+    }
   });
 
-  searchInput.addEventListener("blur", () => {
-    setTimeout(() => clearSuggestions(), 150);
-  });
+  clearIcon.addEventListener("click", () => {
+    searchInput.value = "";
+    clearIcon.style.display = "none";
+    hideNoResults();
 
-  imageModal.addEventListener("click", () => {
-    imageModal.style.display = "none";
+    document.querySelectorAll(".card").forEach((card) => {
+      card.style.display = "flex";
+    });
   });
 });
